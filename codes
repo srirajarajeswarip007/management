@@ -1,0 +1,142 @@
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class WordCount {
+
+    public static class Map
+            extends Mapper<Object, Text, Text, IntWritable> {
+
+        public void map(Object key, Text value, Context context)
+                throws IOException, InterruptedException {
+
+            StringTokenizer words =
+                    new StringTokenizer(value.toString());
+
+            while (words.hasMoreTokens()) {
+                Text word = new Text(words.nextToken());
+                context.write(word, new IntWritable(1));
+            }
+        }
+    }
+
+    public static class Reduce
+            extends Reducer<Text, IntWritable, Text, IntWritable> {
+
+        public void reduce(Text key, Iterable<IntWritable> values,
+                           Context context)
+                throws IOException, InterruptedException {
+
+            int sum = 0;
+
+            for (IntWritable value : values) {
+                sum += value.get();
+            }
+
+            context.write(key, new IntWritable(sum));
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+
+        Job job = Job.getInstance(
+                new Configuration(), "Word Count");
+
+        job.setJarByClass(WordCount.class);
+
+        job.setMapperClass(Map.class);
+        job.setReducerClass(Reduce.class);
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(IntWritable.class);
+
+        FileInputFormat.addInputPath(
+                job, new Path(args[0]));
+
+        FileOutputFormat.setOutputPath(
+                job, new Path(args[1]));
+
+        System.exit(
+                job.waitForCompletion(true) ? 0 : 1);
+    }
+}
+===================================
+  val inputfile = sc.textFile("input.txt")
+
+val counts = inputfile
+    .flatMap(line => line.split("\\s+"))
+    .map(word => (word, 1))
+    .reduceByKey(_ + _)
+
+counts.collect()
+  ===================================
+  from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+if rank == 0:
+    arr = list(range(1, 101))
+else:
+    arr = None
+
+local_arr = comm.scatter(
+    [
+        arr[i:i + 25]
+        for i in range(0, 100, 25)
+    ] if rank == 0 else None,
+    root=0
+)
+
+local_sum = sum(local_arr)
+
+total_sum = comm.reduce(
+    local_sum,
+    op=MPI.SUM,
+    root=0
+)
+
+print("Process", rank, "local sum =", local_sum)
+
+if rank == 0:
+    print("Total sum =", total_sum)
+
+MPI.Finalize()
+
+  mpirun -np 4 python3 mpi_sum.py
+  mpiexec.mpich -n 4 python3 mpi_sum.py
+  ===================================
+  #include <stdio.h>
+#include <omp.h>
+
+int main() {
+    int arr[100];
+    int sum = 0;
+    int i;
+
+    // Initialize array
+    for (i = 0; i < 100; i++) {
+        arr[i] = i + 1;
+    }
+
+    // Parallel sum
+    #pragma omp parallel for reduction(+:sum)
+    for (i = 0; i < 100; i++) {
+        sum += arr[i];
+    }
+
+    printf("Total sum = %d\n", sum);
+
+    return 0;
+}
+
+gcc -fopenmp openmp_sum.c -o openmp_sum
+./openmp_sum
